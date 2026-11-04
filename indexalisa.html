@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClassRoom - Sistem Informasi Kelas</title>
+</head>
+
+<body>
+    <!-- HEADER -->
+    <header>
+        <h1>ClassRoom</h1>
+        <p>Sistem Informasi Jadwal Ruangan dan Pengumpulan Tugas</p>
+
+        <!-- NAVBAR -->
+        <nav>
+            <a href="#dashboard">Dashboard</a>
+            <a href="#jadwal">Jadwal Kelas</a>
+            <a href="#tugas">Daftar Tugas</a>
+            <a href="#pengumpulan">Kumpulkan Tugas</a>
+            <a href="#riwayat">Riwayat</a>
+        </nav>
+    </header>
+
+    <main>
+
+        <!-- DASHBOARD -->
+        <section id="dashboard">
+            <h2>Dashboard</h2>
+            <p>Selamat datang di ClassRoom!</p>
+            <p>Platform informasi jadwal kelas dan pengumpulan tugas online.</p>
+
+            <h3>Informasi Siswa</h3>
+            <p>Nama: Alisa</p>
+            <p>Kelas: XI RPL 1</p>
+            <p>Jurusan: Rekayasa Perangkat Lunak</p>
+
+            <h3>Ringkasan</h3>
+            <ul>
+                <li>Total Jadwal: 5</li>
+                <li>Tugas Belum Dikumpulkan: 3</li>
+                <li>Tugas Sudah Dikumpulkan: 4</li>
+            </ul>
+        </section>
+
+        <hr>
+
+        <!-- JADWAL KELAS -->
+        <section id="jadwal">
+            <h2>Jadwal Penggunaan Ruangan Kelas</h2>
+
+            <label for="pilih-kelas">Pilih Kelas:</label>
+            <select id="pilih-kelas">
+                <option>Semua Kelas</option>
+                <option>X RPL 1</option>
+                <option>X RPL 2</option>
+                <option>XI RPL 1</option>
+                <option>XI RPL 2</option>
+                <option>XII RPL 1</option>
+            </select>
+
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>Hari</th>
+                        <th>Jam</th>
+                        <th>Kelas</th>
+                        <th>Mata Pelajaran</th>
+                        <th>Guru</th>
+                        <th>Ruangan</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr>
+                        <td>Senin</td>
+                        <td>07.00 - 08.30</td>
+                        <td>XI RPL 1</td>
+                        <td>Pemrograman Web</td>
+                        <td>Pak Budi</td>
+                        <td>Lab RPL 1</td>
+                    </tr>
+
+                    <tr>
+                        <td>Senin</td>
+                        <td>08.30 - 10.00</td>
+                        <td>XI RPL 2</td>
+                        <td>Basis Data</td>
+                        <td>Bu Sinta</td>
+                        <td>Lab RPL 2</td>
+                    </tr>
+
+                    <tr>
+                        <td>Selasa</td>
+                        <td>07.00 - 08.30</td>
+                        <td>X RPL 1</td>
+                        <td>HTML Dasar</td>
+                        <td>Pak Andi</td>
+                        <td>Lab RPL 1</td>
+                    </tr>
+
+                    <tr>
+                        <td>Rabu</td>
+                        <td>09.00 - 10.30</td>
+                        <td>XII RPL 1</td>
+                        <td>Pemrograman Python</td>
+                        <td>Bu Rina</td>
+                        <td>Lab RPL 2</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <hr>
+
+        <!-- DAFTAR TUGAS -->
+        <section id="tugas">
+            <h2>Daftar Tugas</h2>
+
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Nama Tugas</th>
+                        <th>Mata Pelajaran</th>
+                        <th>Kelas</th>
+                        <th>Guru</th>
+                        <th>Batas Pengumpulan</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>Membuat Website HTML</td>
+                        <td>Pemrograman Web</td>
+                        <td>XI RPL 1</td>
+                        <td>Pak Budi</td>
+                        <td>10 November 2026</td>
+                        <td>Belum Dikumpulkan</td>
+                    </tr>
+
+                    <tr>
+                        <td>2</td>
+                        <td>Membuat Database</td>
+                        <td>Basis Data</td>
+                        <td>XI RPL 1</td>
+                        <td>Bu Sinta</td>
+                        <td>12 November 2026</td>
+                        <td>Belum Dikumpulkan</td>
+                    </tr>
+
+                    <tr>
+                        <td>3</td>
+                        <td>Membuat Program Python</td>
+                        <td>Pemrograman Dasar</td>
+                        <td>XI RPL 1</td>
+                        <td>Bu Rina</td>
+                        <td>15 November 2026</td>
+                        <td>Sudah Dikumpulkan</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <hr>
+
+        <!-- PENGUMPULAN TUGAS -->
+        <section id="pengumpulan">
+            <h2>Pengumpulan Tugas Online</h2>
+
+            <form action="#" method="post" enctype="multipart/form-data">
+
+                <label for="nama">Nama Siswa:</label>
+                <input type="text" id="nama" name="nama" required>
+
+                <br><br>
+
+                <label for="kelas">Kelas:</label>
+                <select id="kelas" name="kelas" required>
+                    <option value="">Pilih Kelas</option>
+                    <option>XI RPL 1</option>
+                    <option>XI RPL 2</option>
+                    <option>X RPL 1</option>
+                    <option>X RPL 2</option>
+                    <option>XII RPL 1</option>
+                </select>
+
+                <br><br>
+
+                <label for="mapel">Mata Pelajaran:</label>
+                <input type="text" id="mapel" name="mapel" required>
+
+                <br><br>
+
+                <label for="nama-tugas">Nama Tugas:</label>
+                <input type="text" id="nama-tugas" name="nama-tugas" required>
+
+                <br><br>
+
+                <label for="file">Upload File Tugas:</label>
+                <input
+                    type="file"
+                    id="file"
+                    name="file"
+                    accept=".pdf,.doc,.docx,.zip"
+                    required
+                >
+
+                <br><br>
+
+                <label for="catatan">Catatan:</label>
+                <br>
+                <textarea id="catatan" name="catatan" rows="4" cols="40"></textarea>
+
+                <br><br>
+
+                <button type="submit">Kirim Tugas</button>
+                <button type="reset">Reset</button>
+
+            </form>
+        </section>
+
+        <hr>
+
+        <!-- RIWAYAT TUGAS -->
+        <section id="riwayat">
+            <h2>Riwayat Pengumpulan Tugas</h2>
+
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Nama Tugas</th>
+                        <th>Tanggal Pengumpulan</th>
+                        <th>File</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>Membuat Program Python</td>
+                        <td>09 November 2026</td>
+                        <td>program.py</td>
+                        <td>Sudah Dikumpulkan</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <p>&copy; 2026 ClassRoom - Sistem Informasi Sekolah</p>
+    </footer>
+
+</body>
+</html>
