@@ -117,6 +117,37 @@ body {
   gap: 8px;
 }
 
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.24);
+  transform: translateY(-1px);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 3px;
+}
+
+.theme-toggle-icon {
+  font-size: 17px;
+  line-height: 1;
+}
+
 /* Main Container */
 .main-wrapper {
   max-width: 1600px;
@@ -743,3 +774,101 @@ body {
 /* Synchronized with style(rezky).css */
 @import url('style(rezky).css');
 
+/* Dark theme */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --card-bg: #1e293b;
+  --body-bg: #0f172a;
+  --border-color: #334155;
+  --text-main: #e2e8f0;
+  --text-muted: #94a3b8;
+  --primary-light: #1e3a8a;
+  --status-ditempati-bg: #451a1a;
+  --status-ditempati-border: #7f1d1d;
+  --status-ditempati-text: #fca5a5;
+  --status-dibooking-bg: #422006;
+  --status-dibooking-border: #854d0e;
+  --status-dibooking-text: #fcd34d;
+  --status-kosong-bg: #052e25;
+  --status-kosong-border: #065f46;
+  --status-kosong-text: #6ee7b7;
+}
+
+html[data-theme="dark"] .filter-select,
+html[data-theme="dark"] .search-box input,
+html[data-theme="dark"] .btn-page,
+html[data-theme="dark"] .modal-card {
+  background-color: var(--card-bg);
+  color: var(--text-main);
+}
+
+html[data-theme="dark"] .schedule-table tbody td.col-room,
+html[data-theme="dark"] .schedule-table tbody td.cell-slot {
+  background-color: var(--card-bg);
+}
+
+html[data-theme="dark"] .schedule-table tbody tr:hover td.cell-slot {
+  background-color: #263449;
+}
+
+html[data-theme="dark"] .schedule-table tbody tr:hover td.col-room {
+  background-color: #263449;
+}
+
+html[data-theme="dark"] .schedule-table th.col-break,
+html[data-theme="dark"] .schedule-table td.cell-break {
+  background-color: #273449 !important;
+}
+
+html[data-theme="dark"] .room-id,
+html[data-theme="dark"] .card-subject,
+html[data-theme="dark"] .modal-header h3 {
+  color: var(--text-main);
+}
+
+html[data-theme="dark"] .room-tag {
+  background-color: #334155;
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .card-meta-row {
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .schedule-card.status-ditempati .card-top span:last-child {
+  color: #fca5a5 !important;
+}
+
+html[data-theme="dark"] .schedule-card.status-dibooking .card-top span:last-child {
+  color: #fcd34d !important;
+}
+
+html[data-theme="dark"] .empty-room-prompt {
+  color: #6ee7b7;
+}
+
+html[data-theme="dark"] .status-badge.ditempati {
+  background-color: #7f1d1d;
+  color: #fecaca;
+}
+
+html[data-theme="dark"] .status-badge.dibooking {
+  background-color: #78350f;
+  color: #fde68a;
+}
+
+html[data-theme="dark"] .status-badge.kosong {
+  background-color: #065f46;
+  color: #a7f3d0;
+}
+
+html[data-theme="dark"] .table-footer,
+html[data-theme="dark"] .modal-header,
+html[data-theme="dark"] .modal-footer {
+  background-color: #172033;
+}
+
+html[data-theme="dark"] .btn-secondary {
+  background-color: #334155;
+  color: var(--text-main);
+}
