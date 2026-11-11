@@ -163,6 +163,8 @@ const filterLantai = document.getElementById('filterLantai');
 const filterStatus = document.getElementById('filterStatus');
 const searchInput = document.getElementById('searchQuery');
 const clockDisplay = document.getElementById('liveClock');
+const themeToggle = document.getElementById('themeToggle');
+const themeToggleLabel = document.getElementById('themeToggleLabel');
 
 // Counter Elements
 const countTotal = document.getElementById('countTotal');
@@ -189,6 +191,33 @@ const modalPurpose = document.getElementById('modalPurpose');
 const btnToggleBooking = document.getElementById('btnToggleBooking');
 
 let activeModalTarget = null;
+
+// Memasang tema tersimpan dan memperbarui label tombol agar menunjukkan pilihan berikutnya.
+function initThemeToggle() {
+  const savedTheme = localStorage.getItem('schoolScheduleTheme');
+  const initialTheme = savedTheme === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = initialTheme;
+
+  function updateThemeToggle(theme) {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    const nextThemeLabel = nextTheme === 'dark' ? 'Mode Gelap' : 'Mode Terang';
+    const nextThemeIcon = nextTheme === 'dark' ? '☾' : '☀';
+
+    themeToggleLabel.textContent = nextThemeLabel;
+    themeToggle.querySelector('.theme-toggle-icon').textContent = nextThemeIcon;
+    themeToggle.setAttribute('aria-label', `Aktifkan ${nextThemeLabel.toLowerCase()}`);
+  }
+
+  updateThemeToggle(initialTheme);
+
+  // Mengganti tema halaman dan menyimpan pilihan supaya tetap aktif saat dibuka kembali.
+  themeToggle.addEventListener('click', () => {
+    const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = nextTheme;
+    localStorage.setItem('schoolScheduleTheme', nextTheme);
+    updateThemeToggle(nextTheme);
+  });
+}
 
 // Initialize Live Clock
 function startClock() {
@@ -554,10 +583,10 @@ modalOverlay.addEventListener('click', (e) => {
 
 // Initialize Everything
 document.addEventListener('DOMContentLoaded', () => {
+  initThemeToggle();
   startClock();
   initSchedules();
   renderTableHeader();
   renderDayTabs();
   renderTable();
 });
-
