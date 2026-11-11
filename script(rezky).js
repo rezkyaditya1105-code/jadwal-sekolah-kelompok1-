@@ -87,6 +87,10 @@ const schedules = {};
 function initSchedules() {
   DAYS.forEach((day, dayIndex) => {
     schedules[day] = {};
+    const assignedClassesBySlot = {};
+    TIME_SLOTS.forEach(slot => {
+      assignedClassesBySlot[slot.id] = new Set();
+    });
 
     ROOMS.forEach((room, roomIdx) => {
       schedules[day][room.id] = {};
@@ -96,40 +100,69 @@ function initSchedules() {
 
         // Pseudo-random deterministic distribution based on indices
         const seed = (dayIndex * 13 + roomIdx * 7 + slotIdx * 11) % 100;
+        const status = seed < 48 ? 'ditempati' : seed < 72 ? 'dibooking' : 'kosong';
 
-        if (seed < 48) {
-          // Status: Ditempati (Guru mengajar, murid belajar)
-          const teacher = TEACHERS[(roomIdx + slotIdx) % TEACHERS.length];
-          const subject = SUBJECTS[(roomIdx + dayIndex) % SUBJECTS.length];
-          const classGroup = CLASSES[(roomIdx * 2 + slotIdx) % CLASSES.length];
+        if (status === 'ditempati' || status === 'dibooking') {
+          // Pastikan satu kelas hanya mendapat satu ruang pada hari dan sesi yang sama.
+          const startingClassIndex = status === 'ditempati'
+            ? (roomIdx * 2 + slotIdx) % CLASSES.length
+            : (roomIdx + 3) % CLASSES.length;
+          const assignedClasses = assignedClassesBySlot[slot.id];
+          let classGroup = null;
 
-          schedules[day][room.id][slot.id] = {
-            status: 'ditempati',
-            teacher: teacher,
-            subject: subject,
-            classGroup: classGroup,
-            purpose: 'KBM / Praktikum Terjadwal'
-          };
-        } else if (seed < 72) {
-          // Status: Dibooking (Persiapan Ujian / Ekskul / Bimbingan Lomba)
-          const teacher = TEACHERS[(roomIdx + dayIndex + 2) % TEACHERS.length];
-          const classGroup = CLASSES[(roomIdx + 3) % CLASSES.length];
-          const bookingReasons = [
-            'Sesi Persiapan Uji Kompetensi Keahlian (UKK)',
-            'Ekskul Coding Club & Robotika',
-            'Bimbingan LKS Tingkat Provinsi',
-            'Pelatihan Sertifikasi Mikrotik / Cisco',
-            'Workshop UI/UX Design Figma'
-          ];
-          const purpose = bookingReasons[(roomIdx + slotIdx) % bookingReasons.length];
+          for (let offset = 0; offset < CLASSES.length; offset++) {
+            const candidate = CLASSES[(startingClassIndex + offset) % CLASSES.length];
+            if (!assignedClasses.has(candidate)) {
+              classGroup = candidate;
+              assignedClasses.add(candidate);
+              break;
+            }
+          }
 
-          schedules[day][room.id][slot.id] = {
-            status: 'dibooking',
-            teacher: teacher,
-            subject: 'Kegiatan Terjadwal / Khusus',
-            classGroup: classGroup,
-            purpose: purpose
-          };
+          // Jika semua kelas sudah memiliki ruang, jadikan ruang ini tersedia.
+          if (!classGroup) {
+            schedules[day][room.id][slot.id] = {
+              status: 'kosong',
+              teacher: '-',
+              subject: '-',
+              classGroup: '-',
+              purpose: 'Ruangan Siap Digunakan'
+            };
+            return;
+          }
+
+          if (status === 'ditempati') {
+            // Status: Ditempati (Guru mengajar, murid belajar)
+            const teacher = TEACHERS[(roomIdx + slotIdx) % TEACHERS.length];
+            const subject = SUBJECTS[(roomIdx + dayIndex) % SUBJECTS.length];
+
+            schedules[day][room.id][slot.id] = {
+              status: 'ditempati',
+              teacher: teacher,
+              subject: subject,
+              classGroup: classGroup,
+              purpose: 'KBM / Praktikum Terjadwal'
+            };
+          } else {
+            // Status: Dibooking (Persiapan Ujian / Ekskul / Bimbingan Lomba)
+            const teacher = TEACHERS[(roomIdx + dayIndex + 2) % TEACHERS.length];
+            const bookingReasons = [
+              'Sesi Persiapan Uji Kompetensi Keahlian (UKK)',
+              'Ekskul Coding Club & Robotika',
+              'Bimbingan LKS Tingkat Provinsi',
+              'Pelatihan Sertifikasi Mikrotik / Cisco',
+              'Workshop UI/UX Design Figma'
+            ];
+            const purpose = bookingReasons[(roomIdx + slotIdx) % bookingReasons.length];
+
+            schedules[day][room.id][slot.id] = {
+              status: 'dibooking',
+              teacher: teacher,
+              subject: 'Kegiatan Terjadwal / Khusus',
+              classGroup: classGroup,
+              purpose: purpose
+            };
+          }
         } else {
           // Status: Kosong (Available)
           schedules[day][room.id][slot.id] = {
@@ -149,6 +182,7 @@ function initSchedules() {
 let currentDay = 'Senin';
 let currentGedung = 'all';
 let currentLantai = 'all';
+let currentClass = 'all';
 let currentStatus = 'all';
 let searchQuery = '';
 let currentPage = 1;
@@ -160,11 +194,16 @@ const scheduleHeader = document.getElementById('scheduleTableHeader');
 const dayTabsContainer = document.getElementById('dayTabs');
 const filterGedung = document.getElementById('filterGedung');
 const filterLantai = document.getElementById('filterLantai');
+const filterKelas = document.getElementById('filterKelas');
 const filterStatus = document.getElementById('filterStatus');
 const searchInput = document.getElementById('searchQuery');
 const clockDisplay = document.getElementById('liveClock');
 const themeToggle = document.getElementById('themeToggle');
 const themeToggleLabel = document.getElementById('themeToggleLabel');
+const currentScheduleDate = document.getElementById('currentScheduleDate');
+const currentScheduleTime = document.getElementById('currentScheduleTime');
+const currentScheduleSession = document.getElementById('currentScheduleSession');
+const currentOccupancyList = document.getElementById('currentOccupancyList');
 
 // Counter Elements
 const countTotal = document.getElementById('countTotal');
@@ -227,9 +266,98 @@ function startClock() {
     if (clockDisplay) {
       clockDisplay.textContent = now.toLocaleDateString('id-ID', options);
     }
+    updateCurrentOccupancy(now);
   }
   updateTime();
   setInterval(updateTime, 1000);
+}
+
+// Memperbarui daftar ruang dan kelas sesuai hari serta sesi yang sedang berlangsung.
+function updateCurrentOccupancy(now = new Date()) {
+  const weekdayNames = ['Minggu', ...DAYS];
+  const weekdayIndex = now.getDay();
+  const dayName = weekdayNames[weekdayIndex];
+  const currentMinute = now.getHours() * 60 + now.getMinutes();
+
+  currentScheduleDate.textContent = now.toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+  currentScheduleTime.textContent = now.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+
+  currentOccupancyList.replaceChildren();
+
+  if (weekdayIndex === 0) {
+    currentScheduleSession.textContent = 'Hari Minggu • Tidak ada jadwal sekolah';
+    currentOccupancyList.innerHTML = '<p class="occupancy-empty">Tidak ada jadwal kelas pada hari Minggu.</p>';
+    return;
+  }
+
+  const currentSlot = TIME_SLOTS.find(slot => {
+    const [start, end] = slot.time.split(' - ').map(time => {
+      const [hours, minutes] = time.split(':').map(Number);
+      return hours * 60 + minutes;
+    });
+    return currentMinute >= start && currentMinute < end;
+  });
+
+  if (!currentSlot) {
+    currentScheduleSession.textContent = 'Di luar jam pembelajaran';
+    currentOccupancyList.innerHTML = '<p class="occupancy-empty">Belum ada sesi pembelajaran aktif saat ini.</p>';
+    return;
+  }
+
+  currentScheduleSession.textContent = `${dayName} • ${currentSlot.label} (${currentSlot.time})`;
+
+  if (currentSlot.isBreak) {
+    currentOccupancyList.innerHTML = `<p class="occupancy-empty">Waktu ${currentSlot.label.toLowerCase()}. Sesi pembelajaran akan diperbarui setelah istirahat.</p>`;
+    return;
+  }
+
+  const daySchedule = schedules[dayName];
+  const occupiedRooms = ROOMS.flatMap(room => {
+    const slotData = daySchedule[room.id][currentSlot.id];
+    if (
+      slotData.status !== 'ditempati' ||
+      (currentClass !== 'all' && slotData.classGroup !== currentClass)
+    ) return [];
+    return [{ room, slotData }];
+  });
+
+  if (occupiedRooms.length === 0) {
+    const emptyMessage = currentClass === 'all'
+      ? 'Tidak ada ruang yang sedang ditempati pada sesi ini.'
+      : `Tidak ada ruang yang sedang ditempati kelas ${currentClass} pada sesi ini.`;
+    currentOccupancyList.textContent = '';
+    const emptyNotice = document.createElement('p');
+    emptyNotice.className = 'occupancy-empty';
+    emptyNotice.textContent = emptyMessage;
+    currentOccupancyList.appendChild(emptyNotice);
+    return;
+  }
+
+  occupiedRooms.forEach(({ room, slotData }) => {
+    const item = document.createElement('article');
+    item.className = 'occupancy-item';
+
+    const roomName = document.createElement('strong');
+    roomName.textContent = `Ruang ${room.id}`;
+
+    const className = document.createElement('span');
+    className.textContent = slotData.classGroup;
+
+    const subject = document.createElement('small');
+    subject.textContent = slotData.subject;
+
+    item.append(roomName, className, subject);
+    currentOccupancyList.appendChild(item);
+  });
 }
 
 // Render Header Columns
@@ -282,6 +410,16 @@ function renderDayTabs() {
   });
 }
 
+// Mengisi pilihan kelas dari daftar yang sama dengan data jadwal.
+function renderClassFilter() {
+  CLASSES.forEach(className => {
+    const option = document.createElement('option');
+    option.value = className;
+    option.textContent = className;
+    filterKelas.appendChild(option);
+  });
+}
+
 // Filter Rooms
 function getFilteredRooms() {
   return ROOMS.filter(room => {
@@ -295,13 +433,23 @@ function getFilteredRooms() {
       return false;
     }
 
+    // Tampilkan ruangan yang memiliki sesi untuk kelas terpilih pada hari aktif.
+    const roomDaySlots = schedules[currentDay][room.id];
+    if (currentClass !== 'all') {
+      const hasClassSchedule = Object.values(roomDaySlots).some(slot =>
+        slot.classGroup === currentClass && slot.status !== 'kosong'
+      );
+      if (!hasClassSchedule) {
+        return false;
+      }
+    }
+
     // Filter Search
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase().trim();
       const matchRoom = room.id.toLowerCase().includes(q) || room.name.toLowerCase().includes(q) || room.type.toLowerCase().includes(q);
       
       // Also check if any teacher or class or subject matches in this room today
-      const roomDaySlots = schedules[currentDay][room.id];
       const matchSchedule = Object.values(roomDaySlots).some(slot => 
         (slot.teacher && slot.teacher.toLowerCase().includes(q)) ||
         (slot.subject && slot.subject.toLowerCase().includes(q)) ||
@@ -552,6 +700,13 @@ filterLantai.addEventListener('change', (e) => {
   renderTable();
 });
 
+filterKelas.addEventListener('change', (e) => {
+  currentClass = e.target.value;
+  currentPage = 1;
+  renderTable();
+  updateCurrentOccupancy();
+});
+
 filterStatus.addEventListener('change', (e) => {
   currentStatus = e.target.value;
   currentPage = 1;
@@ -584,8 +739,9 @@ modalOverlay.addEventListener('click', (e) => {
 // Initialize Everything
 document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
-  startClock();
   initSchedules();
+  startClock();
+  renderClassFilter();
   renderTableHeader();
   renderDayTabs();
   renderTable();
