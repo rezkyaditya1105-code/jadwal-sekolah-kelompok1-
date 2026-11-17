@@ -179,14 +179,15 @@ function initSchedules() {
 }
 
 // App State
-let currentDay = 'Senin';
+let currentDay = DAYS[new Date().getDay() - 1] || DAYS[0];
 let currentGedung = 'all';
 let currentLantai = 'all';
 let currentClass = 'all';
-let currentStatus = 'all';
 let searchQuery = '';
 let currentPage = 1;
 const itemsPerPage = 12; // Menampilkan 12 ruangan per page agar tidak lag, dengan tombol page
+let renderedUpcomingClassSlotId = null;
+let lastUpcomingCheckMinute = '';
 
 // DOM Elements
 const scheduleBody = document.getElementById('scheduleTableBody');
@@ -195,11 +196,16 @@ const dayTabsContainer = document.getElementById('dayTabs');
 const filterGedung = document.getElementById('filterGedung');
 const filterLantai = document.getElementById('filterLantai');
 const filterKelas = document.getElementById('filterKelas');
-const filterStatus = document.getElementById('filterStatus');
 const searchInput = document.getElementById('searchQuery');
 const clockDisplay = document.getElementById('liveClock');
 const themeToggle = document.getElementById('themeToggle');
 const themeToggleLabel = document.getElementById('themeToggleLabel');
+const sidebar = document.getElementById('appSidebar');
+const sidebarBrand = document.querySelector('.sidebar-brand');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+const sidebarLinks = document.querySelectorAll('.sidebar-link');
+const footerYear = document.getElementById('footerYear');
 const currentScheduleDate = document.getElementById('currentScheduleDate');
 const currentScheduleTime = document.getElementById('currentScheduleTime');
 const currentScheduleSession = document.getElementById('currentScheduleSession');
@@ -230,6 +236,71 @@ const modalPurpose = document.getElementById('modalPurpose');
 const btnToggleBooking = document.getElementById('btnToggleBooking');
 
 let activeModalTarget = null;
+
+function initializeSidebar() {
+  function setActiveSidebarLink(hash = window.location.hash || '#overview') {
+    const activeLink = Array.from(sidebarLinks).find(link => link.hash === hash);
+    if (!activeLink) return;
+
+    sidebarLinks.forEach(link => {
+      const isActive = link === activeLink;
+      link.classList.toggle('active', isActive);
+      if (isActive) {
+        link.setAttribute('aria-current', 'page');
+      } else {
+        link.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  function syncSidebarState() {
+    const isOpen = document.body.classList.contains('sidebar-open');
+    sidebar.inert = window.innerWidth <= 768 && !isOpen;
+    sidebarToggle.setAttribute('aria-expanded', String(isOpen));
+    sidebarToggle.setAttribute('aria-label', isOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi');
+  }
+
+  function closeSidebar(restoreFocus = false) {
+    document.body.classList.remove('sidebar-open');
+    syncSidebarState();
+    if (restoreFocus) sidebarToggle.focus();
+  }
+
+  sidebarToggle.addEventListener('click', () => {
+    document.body.classList.toggle('sidebar-open');
+    syncSidebarState();
+  });
+
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) document.body.classList.remove('sidebar-open');
+    syncSidebarState();
+  });
+
+  sidebarBackdrop.addEventListener('click', () => closeSidebar(true));
+
+  sidebarLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      setActiveSidebarLink(link.hash);
+      closeSidebar();
+    });
+  });
+
+  sidebarBrand.addEventListener('click', () => {
+    setActiveSidebarLink(sidebarBrand.hash);
+    closeSidebar();
+  });
+
+  window.addEventListener('hashchange', () => setActiveSidebarLink());
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && document.body.classList.contains('sidebar-open')) {
+      closeSidebar(true);
+    }
+  });
+
+  setActiveSidebarLink();
+  syncSidebarState();
+}
 
 // Memasang tema tersimpan dan memperbarui label tombol agar menunjukkan pilihan berikutnya.
 function initThemeToggle() {
@@ -267,6 +338,14 @@ function startClock() {
       clockDisplay.textContent = now.toLocaleDateString('id-ID', options);
     }
     updateCurrentOccupancy(now);
+
+    const minuteKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}`;
+    if (currentClass !== 'all' && minuteKey !== lastUpcomingCheckMinute) {
+      lastUpcomingCheckMinute = minuteKey;
+      if (getUpcomingClassSlotId(now) !== renderedUpcomingClassSlotId) {
+        renderTable();
+      }
+    }
   }
   updateTime();
   setInterval(updateTime, 1000);
@@ -420,8 +499,87 @@ function renderClassFilter() {
   });
 }
 
+function normalizeSearchText(value) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+// Kenali pencarian jurusan/kelas agar pencarian memakai semua sesi pada hari aktif.
+function getClassSearchCriteria(query) {
+  const words = normalizeSearchText(query).split(/\s+/).filter(Boolean);
+  const trackWord = words.find(word => ['tkj', 'tjkt', 'rpl', 'dkv', 'pplg'].includes(word));
+  if (!trackWord) return null;
+
+  return {
+    track: trackWord === 'tjkt' ? 'tkj' : trackWord,
+    grade: words.find(word => ['x', 'xi', 'xii'].includes(word)),
+    classNumber: words.find(word => ['1', '2'].includes(word))
+  };
+}
+
+function slotMatchesClassSearch(slot, criteria) {
+  if (!criteria || slot.status === 'kosong' || !slot.classGroup) return false;
+
+  const classWords = normalizeSearchText(slot.classGroup)
+    .replace(/\btjkt\b/g, 'tkj')
+    .split(/\s+/);
+
+  return classWords.includes(criteria.track) &&
+    (!criteria.grade || classWords.includes(criteria.grade)) &&
+    (!criteria.classNumber || classWords.includes(criteria.classNumber));
+}
+
+// Mencocokkan kata kunci pada data ruang atau satu data jadwal yang sama.
+function matchesSearchQuery(room, roomDaySlots, query) {
+  const normalizedQuery = normalizeSearchText(query);
+  const keywords = normalizedQuery.split(/\s+/).filter(Boolean);
+  if (keywords.length === 0) return true;
+
+  // Cari nama jurusan pada semua sesi di hari terpilih; X TJKT juga dihitung sebagai TKJ.
+  const classCriteria = getClassSearchCriteria(query);
+  if (classCriteria) {
+    return Object.values(roomDaySlots).some(slot => slotMatchesClassSearch(slot, classCriteria));
+  }
+
+  const searchableValues = [
+    room.id,
+    room.name,
+    room.type,
+    `gedung ${room.gedung}`,
+    `lantai ${room.lantai}`,
+    ...Object.values(roomDaySlots).flatMap(slot => [
+      slot.teacher,
+      slot.subject,
+      slot.classGroup,
+      slot.purpose,
+      slot.status
+    ])
+  ].filter(Boolean).map(normalizeSearchText);
+
+  return searchableValues.some(value => {
+    if (value.includes(normalizedQuery)) return true;
+
+    const words = value.split(/\s+/);
+    return keywords.every(keyword => words.some(word =>
+      keyword.length === 1 ? word === keyword : word.startsWith(keyword)
+    ));
+  });
+}
+
 // Filter Rooms
 function getFilteredRooms() {
+  const normalizedQuery = normalizeSearchText(searchQuery);
+  const classSearchCriteria = getClassSearchCriteria(searchQuery);
+  const exactRoomMatch = normalizedQuery
+    ? ROOMS.find(room =>
+      normalizeSearchText(room.id) === normalizedQuery ||
+      normalizeSearchText(room.name) === normalizedQuery
+    )
+    : null;
+
   return ROOMS.filter(room => {
     // Filter Gedung
     if (currentGedung !== 'all' && room.gedung !== parseInt(currentGedung)) {
@@ -435,7 +593,7 @@ function getFilteredRooms() {
 
     // Tampilkan ruangan yang memiliki sesi untuk kelas terpilih pada hari aktif.
     const roomDaySlots = schedules[currentDay][room.id];
-    if (currentClass !== 'all') {
+    if (currentClass !== 'all' && !classSearchCriteria) {
       const hasClassSchedule = Object.values(roomDaySlots).some(slot =>
         slot.classGroup === currentClass && slot.status !== 'kosong'
       );
@@ -446,33 +604,36 @@ function getFilteredRooms() {
 
     // Filter Search
     if (searchQuery.trim() !== '') {
-      const q = searchQuery.toLowerCase().trim();
-      const matchRoom = room.id.toLowerCase().includes(q) || room.name.toLowerCase().includes(q) || room.type.toLowerCase().includes(q);
-      
-      // Also check if any teacher or class or subject matches in this room today
-      const matchSchedule = Object.values(roomDaySlots).some(slot => 
-        (slot.teacher && slot.teacher.toLowerCase().includes(q)) ||
-        (slot.subject && slot.subject.toLowerCase().includes(q)) ||
-        (slot.classGroup && slot.classGroup.toLowerCase().includes(q)) ||
-        (slot.status && slot.status.toLowerCase().includes(q))
-      );
-
-      if (!matchRoom && !matchSchedule) {
+      if (exactRoomMatch && room.id !== exactRoomMatch.id) {
         return false;
       }
-    }
-
-    // Filter Status: cek apakah ruangan ini memiliki slot dengan status tersebut pada hari aktif
-    if (currentStatus !== 'all') {
-      const roomDaySlots = schedules[currentDay][room.id];
-      const hasStatus = Object.values(roomDaySlots).some(slot => slot.status === currentStatus);
-      if (!hasStatus) {
+      if (!exactRoomMatch && !matchesSearchQuery(room, roomDaySlots, searchQuery)) {
         return false;
       }
     }
 
     return true;
   });
+}
+
+function getUpcomingClassSlotId(now = new Date()) {
+  if (currentClass === 'all') return null;
+
+  const currentMinute = now.getHours() * 60 + now.getMinutes();
+  for (const slot of TIME_SLOTS) {
+    if (slot.isBreak) continue;
+
+    const [hours, minutes] = slot.time.split(' - ')[0].split(':').map(Number);
+    if (hours * 60 + minutes <= currentMinute) continue;
+
+    const hasUpcomingClass = ROOMS.some(room => {
+      const slotData = schedules[currentDay][room.id][slot.id];
+      return slotData.classGroup === currentClass && slotData.status !== 'kosong';
+    });
+    if (hasUpcomingClass) return slot.id;
+  }
+
+  return null;
 }
 
 // Update Summary Stats
@@ -501,6 +662,9 @@ function updateStats(filteredRooms) {
 // Render Table Body
 function renderTable() {
   const filteredRooms = getFilteredRooms();
+  const classSearchCriteria = getClassSearchCriteria(searchQuery);
+  const upcomingClassSlotId = getUpcomingClassSlotId();
+  renderedUpcomingClassSlotId = upcomingClassSlotId;
   updateStats(filteredRooms);
 
   const totalPages = Math.ceil(filteredRooms.length / itemsPerPage) || 1;
@@ -557,14 +721,21 @@ function renderTable() {
         `;
       } else {
         const slotData = schedules[currentDay][room.id][slot.id] || { status: 'kosong' };
+        if (classSearchCriteria && !slotMatchesClassSearch(slotData, classSearchCriteria)) {
+          bodyHtml += '<td class="cell-slot"></td>';
+          return;
+        }
+        const isUpcomingClass = slot.id === upcomingClassSlotId &&
+          slotData.classGroup === currentClass &&
+          slotData.status !== 'kosong';
         
         let cardContent = '';
         if (slotData.status === 'ditempati') {
           cardContent = `
-            <div class="schedule-card status-ditempati" onclick="openModal('${room.id}', '${slot.id}')">
+            <div class="schedule-card status-ditempati${isUpcomingClass ? ' status-upcoming' : ''}" onclick="openModal('${room.id}', '${slot.id}')">
               <div class="card-top">
-                <span class="status-badge ditempati">Ditempati</span>
-                <span style="font-size: 10px; color: #991b1b; font-weight: 600;">KBM Aktif</span>
+                <span class="status-badge ${isUpcomingClass ? 'upcoming' : 'ditempati'}">${isUpcomingClass ? 'Akan Ditempati' : 'Ditempati'}</span>
+                <span style="font-size: 10px; color: ${isUpcomingClass ? 'var(--status-upcoming-text)' : '#991b1b'}; font-weight: 600;">${isUpcomingClass ? 'Sesi Berikutnya' : 'KBM Aktif'}</span>
               </div>
               <div class="card-subject" title="${slotData.subject}">${slotData.subject}</div>
               <div class="card-meta-row">
@@ -579,10 +750,10 @@ function renderTable() {
           `;
         } else if (slotData.status === 'dibooking') {
           cardContent = `
-            <div class="schedule-card status-dibooking" onclick="openModal('${room.id}', '${slot.id}')">
+            <div class="schedule-card status-dibooking${isUpcomingClass ? ' status-upcoming' : ''}" onclick="openModal('${room.id}', '${slot.id}')">
               <div class="card-top">
-                <span class="status-badge dibooking">Dibooking</span>
-                <span style="font-size: 10px; color: #b45309; font-weight: 600;">Reserved</span>
+                <span class="status-badge ${isUpcomingClass ? 'upcoming' : 'dibooking'}">${isUpcomingClass ? 'Akan Ditempati' : 'Dibooking'}</span>
+                <span style="font-size: 10px; color: ${isUpcomingClass ? 'var(--status-upcoming-text)' : '#b45309'}; font-weight: 600;">${isUpcomingClass ? 'Sesi Berikutnya' : 'Reserved'}</span>
               </div>
               <div class="card-subject" title="${slotData.purpose}">${slotData.purpose}</div>
               <div class="card-meta-row">
@@ -707,14 +878,12 @@ filterKelas.addEventListener('change', (e) => {
   updateCurrentOccupancy();
 });
 
-filterStatus.addEventListener('change', (e) => {
-  currentStatus = e.target.value;
-  currentPage = 1;
-  renderTable();
-});
-
 searchInput.addEventListener('input', (e) => {
   searchQuery = e.target.value;
+  if (getClassSearchCriteria(searchQuery)) {
+    currentClass = 'all';
+    filterKelas.value = 'all';
+  }
   currentPage = 1;
   renderTable();
 });
@@ -738,9 +907,11 @@ modalOverlay.addEventListener('click', (e) => {
 
 // Initialize Everything
 document.addEventListener('DOMContentLoaded', () => {
+  initializeSidebar();
   initThemeToggle();
   initSchedules();
   startClock();
+  footerYear.textContent = new Date().getFullYear();
   renderClassFilter();
   renderTableHeader();
   renderDayTabs();
